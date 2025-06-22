@@ -2,8 +2,11 @@ import streamlit as st
 import random
 
 # -------------------
-# 수업 목표
-lesson_goals = [
+# 수업 주제 기본값 (원하는 경우)
+default_topic = "사용자 입력 학습 목표 수업"
+
+# 수업 목표 예시(참고용, 실제 입력은 사용자에게 받음)
+example_goals = [
     "자연 현상과 일상생활에 대한 흥미와 호기심을 바탕으로 문제를 인식하고 해결하는 태도 함양",
     "과학 탐구 방법을 이해하고 문제를 과학적으로 탐구하는 능력 기르기",
     "생태계의 개념을 이해하고 환경 문제 해결 의지 함양",
@@ -42,10 +45,9 @@ negative_keywords = ["어렵", "지루", "이해못", "싫", "부족", "시간�
 
 # -------------------
 # 수업 계획 생성 함수
-def generate_lesson_plan(topic, approach, time_dist):
-    goal = random.choice(lesson_goals)
+def generate_lesson_plan(goal, approach, time_dist):
     plan = {
-        "주제": topic,
+        "주제": default_topic,
         "목표": goal,
         "시간배분": time_dist
     }
@@ -61,7 +63,7 @@ def generate_lesson_plan(topic, approach, time_dist):
 # -------------------
 # 수업 설계 근거 및 이유 자동 생성 함수
 def generate_rationale(topic, goal, activities, time_dist):
-    rationale = f"이번 수업 주제는 '{topic}'입니다. 주요 학습 목표는 '{goal}'이며, 이는 학생들이 과학 탐구 능력과 환경 문제에 대한 참여 의식을 기르도록 돕기 위함입니다.\n\n"
+    rationale = f"이번 수업 주제는 '{topic}'이며, 주요 학습 목표는 '{goal}'입니다.\n\n"
     rationale += "수업은 전반부, 중반부, 후반부로 나누어 구성하였고, 각 단계별 활동 선정에는 다음과 같은 이유가 있습니다:\n"
     for phase in ["전반부", "중반부", "후반부"]:
         activity = activities[phase]['활동']
@@ -89,7 +91,6 @@ def analyze_feedback(feedback_list):
 # -------------------
 # 피드백 기반 수업 개선 제안 (단순 예시)
 def improve_plan(plan, feedback_analysis):
-    # 부정 피드백이 많은 단계가 있으면 해당 단계 활동 교체
     phases = ["전반부", "중반부", "후반부"]
     modified = False
     for phase in phases:
@@ -99,7 +100,6 @@ def improve_plan(plan, feedback_analysis):
             candidates = [m for m, _ in lesson_activities[next(iter(lesson_activities))][phase] if m != current_activity]
             if candidates:
                 new_activity = random.choice(candidates)
-                # 도구 찾기
                 for mode in lesson_activities:
                     for m, tools in lesson_activities[mode][phase]:
                         if m == new_activity:
@@ -110,11 +110,14 @@ def improve_plan(plan, feedback_analysis):
 
 # -------------------
 # Streamlit UI 시작
-st.set_page_config(page_title="AI 수업 설계기 - 완성판", layout="wide")
-st.title("📘 AI 수업 설계기 - 탐구/활동/개념 선택, 시간 배분, 피드백 반영")
+st.set_page_config(page_title="AI 수업 설계기 (학습 목표 입력)", layout="wide")
+st.title("📘 AI 수업 설계기 - 학습 목표 입력 기반")
 
-st.header("1️⃣ 수업 주제 입력")
-topic = st.text_input("수업 주제를 입력하세요 (예: 생물과 환경)")
+st.header("1️⃣ 학습 목표 입력")
+goal = st.text_area(
+    "학습 목표를 직접 입력하세요 (예: 과학 탐구 방법을 이해하고 문제를 과학적으로 탐구하는 능력 기르기)",
+    height=100
+)
 
 st.header("2️⃣ 수업 방식 선택")
 approach = st.radio("주로 어떤 방식으로 수업할까요?", options=["탐구", "활동", "개념"])
@@ -135,9 +138,9 @@ else:
         st.stop()
     time_dist = {"전반부": t1, "중반부": t2, "후반부": t3}
 
-if topic:
-    plan = generate_lesson_plan(topic, approach, time_dist)
-    rationale = generate_rationale(topic, plan["목표"], plan, time_dist)
+if goal:
+    plan = generate_lesson_plan(goal, approach, time_dist)
+    rationale = generate_rationale(plan["주제"], goal, plan, time_dist)
 
     st.subheader("📋 생성된 수업안")
     st.markdown(f"**주제:** {plan['주제']}")
@@ -149,10 +152,10 @@ if topic:
     st.info(rationale)
 
     st.header("4️⃣ 수업 피드백 입력")
-    st.markdown("수업 후 학생, 교사 피드백을 입력하세요. (빈 줄 입력 시 종료)")
+    st.markdown("수업 후 학생, 교사 피드백을 입력하세요. (각 피드백을 줄바꿈으로 구분)")
 
+    feedback_text = st.text_area("피드백을 입력하세요", height=150)
     feedbacks = []
-    feedback_text = st.text_area("피드백을 입력하세요 (각 피드백을 줄바꿈으로 구분)", height=150)
     if feedback_text:
         feedbacks = [f.strip() for f in feedback_text.split("\n") if f.strip()]
 
@@ -162,7 +165,6 @@ if topic:
         for fb, sent in feedback_analysis:
             st.write(f"• \"{fb}\" — [{sent}]")
 
-        # 수업 개선 제안
         modified, new_plan = improve_plan(plan.copy(), feedback_analysis)
         if modified:
             st.success("🔧 부정적 피드백에 따라 일부 활동을 변경했습니다.")
@@ -170,10 +172,9 @@ if topic:
             for phase in ["전반부", "중반부", "후반부"]:
                 tools_str = ", ".join(new_plan[phase]["도구"])
                 st.markdown(f"- **{phase}** ({time_dist[phase]}분): {new_plan[phase]['활동']}  🧰 도구: {tools_str}")
-            new_rationale = generate_rationale(topic, new_plan["목표"], new_plan, time_dist)
+            new_rationale = generate_rationale(new_plan["주제"], new_plan["목표"], new_plan, time_dist)
             st.info(new_rationale)
         else:
             st.info("✅ 피드백에 따른 수업 개선이 필요하지 않습니다.")
-
 else:
-    st.info("👈 위 입력란에 수업 주제를 입력해주세요.")
+    st.info("👈 위 입력란에 학습 목표를 입력해주세요.")
