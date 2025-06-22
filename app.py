@@ -73,7 +73,7 @@ def simple_sentiment_analysis(text):
     elif neg_count > pos_count:
         return "부정"
     else:
-        return None  # 중립은 분석에서 제외
+        return None  # 중립은 분석에 반영 안함
 
 # 6. 피드백 분석 및 단계 매칭
 def analyze_feedback(plan, feedbacks):
@@ -91,7 +91,7 @@ def analyze_feedback(plan, feedbacks):
             unmatched_feedback.append(fb)
         else:
             sentiment = simple_sentiment_analysis(fb)
-            if sentiment:
+            if sentiment is not None:  # 중립 제외
                 phase_feedback[matched_phase].append((fb, sentiment))
 
     return phase_feedback, unmatched_feedback
@@ -129,32 +129,36 @@ def plot_feedback(phase_feedback):
     ax.set_xlabel('수업 단계')
     ax.set_ylabel('피드백 개수')
     ax.set_title('단계별 긍정/부정 피드백 수')
-    ax.set_xticks([i + bar_width / 2 for i in index])
+    ax.set_xticks([i + bar_width/2 for i in index])
     ax.set_xticklabels(phases)
     ax.legend()
 
     st.pyplot(fig)
 
-# --- Streamlit UI ---
+# 9. 초기화 세션 상태 관리
+if 'feedbacks' not in st.session_state:
+    st.session_state.feedbacks = []
+if 'unmatched_phases' not in st.session_state:
+    st.session_state.unmatched_phases = {}
 
+# UI 시작
 st.title("📘 AI 수업 설계 및 단계별 감정 피드백 분석")
 
+# 학습 목표 선택
 st.header("1️⃣ 학습 목표 선택")
 goal = st.selectbox("학습 목표를 선택하세요:", lesson_goals)
 
+# 수업 주제 입력
 st.header("2️⃣ 수업 주제 입력")
 topic = st.text_input("수업 주제를 입력하세요 (예: 생물과 환경)")
 
 if topic and goal:
-    # 최초 수업 설계
-    if "plan" not in st.session_state:
+    if 'plan' not in st.session_state:
         st.session_state.plan = generate_lesson_plan(topic, goal)
-        st.session_state.phase_feedback = {"전반부": [], "중반부": [], "후반부": []}
-        st.session_state.unmatched_feedback = []
-        st.session_state.feedbacks = []
+
+    plan = st.session_state.plan
 
     st.subheader("📋 생성된 수업안")
-    plan = st.session_state.plan
     st.markdown(f"**주제:** {plan['주제']}")
     st.markdown(f"**목표:** {plan['목표']}")
     for phase in ["전반부", "중반부", "후반부"]:
@@ -163,78 +167,97 @@ if topic and goal:
 
     st.info(plan["설명"])
 
-    st.header("3️⃣ 수업 피드백 입력 (개수 제한 없음)")
-    new_fb = st.text_area("피드백을 자유롭게 입력하세요. 각 피드백은 한 줄씩 구분합니다.")
+    st.header("3️⃣ 수업 피드백 입력")
+    st.markdown("각 단계별 활동명을 포함하여 피드백을 작성해주세요.\n(예: 전반부 활동인 '흥미 유발 영상 시청'이 좋았어요.)")
 
-    if st.button("피드백 추가 및 분석"):
-        if new_fb.strip() == "":
-            st.warning("피드백을 입력해주세요.")
-        else:
-            # 입력한 피드백을 줄 단위로 분리해 리스트에 추가
-            added_feedbacks = [line.strip() for line in new_fb.strip().split("\n") if line.strip()]
-            st.session_state.feedbacks.extend(added_feedbacks)
+    # 무제한 피드백 입력
+    new_fb = st.text_input("새 피드백을 입력하고 Enter를 누르세요:")
+    if new_fb:
+        st.session_state.feedbacks.append(new_fb)
+        # 입력창 초기화 효과를 위해 rerun 대신 값 제거
+        st.experimental_rerun()
 
-            # 피드백 분석
-            phase_fb, unmatched_fb = analyze_feedback(st.session_state.plan, st.session_state.feedbacks)
-
-            # 기존 피드백에 더해 갱신
-            for phase in ["전반부", "중반부", "후반부"]:
-                st.session_state.phase_feedback[phase] = phase_fb[phase]
-            st.session_state.unmatched_feedback = unmatched_fb
-
-            # Clear input box
-            st.experimental_rerun()
-
-    # 피드백 현황 보여주기
+    # 기존 피드백 보여주기
     if st.session_state.feedbacks:
-        st.subheader("📝 현재까지 입력된 피드백")
-        for i, fb in enumerate(st.session_state.feedbacks, 1):
-            st.write(f"{i}. {fb}")
+        st.markdown("### 입력된 피드백 목록")
+        for i, fb in enumerate(st.session_state.feedbacks):
+            st.write(f"{i+1}. {fb}")
 
-    # 매칭되지 않은 피드백 처리
-    if st.session_state.unmatched_feedback:
-        st.warning("⚠️ 일부 피드백에서 활동 단계가 인식되지 않았습니다. 아래에서 맞는 단계를 선택해주세요.")
-        for i, fb in enumerate(st.session_state.unmatched_feedback):
-            key = f"unmatched_{i}"
-            if key not in st.session_state:
-                st.session_state[key] = "전반부"  # 기본값 설정
-            phase_select = st.selectbox(f"피드백: {fb}", options=["전반부", "중반부", "후반부"], key=key)
-            # 할당은 위젯의 key로 자동 처리되므로 직접 쓰지 않아도 됨
+    # 피드백 분석 및 수정 버튼
+    if st.button("피드백 분석 및 수업안 수정"):
+        phase_feedback, unmatched = analyze_feedback(plan, st.session_state.feedbacks)
 
-        # 매칭된 피드백 업데이트 버튼
-        if st.button("매칭된 단계로 반영 및 수업안 수정"):
-            # unmatched feedback을 선택된 단계로 이동시키기
-            new_phase_feedback = st.session_state.phase_feedback.copy()
-            for i, fb in enumerate(st.session_state.unmatched_feedback):
-                key = f"unmatched_{i}"
-                matched_phase = st.session_state[key]
-                sentiment = simple_sentiment_analysis(fb)
-                if sentiment:
-                    new_phase_feedback[matched_phase].append((fb, sentiment))
-            st.session_state.phase_feedback = new_phase_feedback
-            st.session_state.unmatched_feedback = []
+        # 미매칭 피드백 처리용 상태 초기화
+        st.session_state.unmatched_phases = {}
 
-            # 수업안 수정
-            new_plan, modified = revise_plan(st.session_state.plan, st.session_state.phase_feedback)
-            if modified:
+        if unmatched:
+            st.warning("⚠️ 일부 피드백에서 활동 단계가 인식되지 않았습니다. 맞는 단계를 선택해주세요.")
+            for i, fb in enumerate(unmatched):
+                phase_select = st.selectbox(f"피드백: {fb}", options=["전반부", "중반부", "후반부"], key=f"unmatched_{i}")
+                st.session_state.unmatched_phases[fb] = phase_select
+
+            # 선택 완료 후 '매칭 반영' 버튼 노출
+            if st.button("매칭 반영 및 분석 계속"):
+                # 매칭 반영
+                for fb, phase in st.session_state.unmatched_phases.items():
+                    sentiment = simple_sentiment_analysis(fb)
+                    if sentiment is not None:
+                        phase_feedback[phase].append((fb, sentiment))
+
+                # 수정 및 시각화
+                new_plan, modified = revise_plan(plan, phase_feedback)
                 st.session_state.plan = new_plan
+
+                st.subheader("🔍 피드백 분석 결과")
+                for phase in ["전반부", "중반부", "후반부"]:
+                    st.markdown(f"### {phase}")
+                    pos = [fb for fb, s in phase_feedback[phase] if s == "긍정"]
+                    neg = [fb for fb, s in phase_feedback[phase] if s == "부정"]
+                    st.markdown(f"- 긍정 피드백 ({len(pos)}개):")
+                    for p in pos:
+                        st.write(f"  - {p}")
+                    st.markdown(f"- 부정 피드백 ({len(neg)}개):")
+                    for n in neg:
+                        st.write(f"  - {n}")
+
+                st.subheader("📊 단계별 긍정/부정 피드백 수 시각화")
+                plot_feedback(phase_feedback)
+
+                if modified:
+                    st.success("🔧 부정 피드백이 많은 단계의 활동을 수정하여 새로운 수업안을 제안합니다.")
+                    st.markdown("### ✏️ 수정된 수업안")
+                    for phase in ["전반부", "중반부", "후반부"]:
+                        tools_str = ", ".join(new_plan[phase]["도구"])
+                        st.markdown(f"- **{phase}**: {new_plan[phase]['활동']}  🧰 도구: {tools_str}")
+                else:
+                    st.info("✅ 모든 단계에서 긍정 피드백이 부정 피드백보다 많아 수업안을 유지합니다.")
+        else:
+            # 미매칭 없으면 바로 분석 진행
+            new_plan, modified = revise_plan(plan, phase_feedback)
+            st.session_state.plan = new_plan
+
+            st.subheader("🔍 피드백 분석 결과")
+            for phase in ["전반부", "중반부", "후반부"]:
+                st.markdown(f"### {phase}")
+                pos = [fb for fb, s in phase_feedback[phase] if s == "긍정"]
+                neg = [fb for fb, s in phase_feedback[phase] if s == "부정"]
+                st.markdown(f"- 긍정 피드백 ({len(pos)}개):")
+                for p in pos:
+                    st.write(f"  - {p}")
+                st.markdown(f"- 부정 피드백 ({len(neg)}개):")
+                for n in neg:
+                    st.write(f"  - {n}")
+
+            st.subheader("📊 단계별 긍정/부정 피드백 수 시각화")
+            plot_feedback(phase_feedback)
+
+            if modified:
                 st.success("🔧 부정 피드백이 많은 단계의 활동을 수정하여 새로운 수업안을 제안합니다.")
+                st.markdown("### ✏️ 수정된 수업안")
+                for phase in ["전반부", "중반부", "후반부"]:
+                    tools_str = ", ".join(new_plan[phase]["도구"])
+                    st.markdown(f"- **{phase}**: {new_plan[phase]['활동']}  🧰 도구: {tools_str}")
             else:
                 st.info("✅ 모든 단계에서 긍정 피드백이 부정 피드백보다 많아 수업안을 유지합니다.")
-
-            st.experimental_rerun()
-
-    # 피드백 시각화
-    if any(len(lst) > 0 for lst in st.session_state.phase_feedback.values()):
-        st.subheader("📊 단계별 긍정/부정 피드백 수 시각화")
-        plot_feedback(st.session_state.phase_feedback)
-
-    # 수정된 또는 기존 수업안 보여주기
-    st.subheader("📋 최종 수업안")
-    final_plan = st.session_state.plan
-    for phase in ["전반부", "중반부", "후반부"]:
-        tools_str = ", ".join(final_plan[phase]["도구"])
-        st.markdown(f"- **{phase}**: {final_plan[phase]['활동']}  🧰 도구: {tools_str}")
-
 else:
     st.info("👈 학습 목표와 수업 주제를 모두 입력해주세요.")
