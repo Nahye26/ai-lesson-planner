@@ -1,0 +1,4 @@
+from transformers import pipeline
+
+sentiment_model = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment")
+print(sentiment_model("이 수업 정말 좋아요!"))
