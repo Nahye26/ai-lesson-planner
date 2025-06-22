@@ -1,4 +1,3 @@
-pip install streamlit transformers sentencepiece
 
 import streamlit as st
 import random
