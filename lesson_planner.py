@@ -1,25 +1,22 @@
+pip install streamlit transformers sentencepiece
+
 import streamlit as st
 import random
-from konlpy.tag import Okt
 from transformers import pipeline
-import os
 
-# ✅ JAVA 환경 설정 (Streamlit Cloud에서는 konlpy 사용 불가 → 대체 필요)
-os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-amd64"  # 환경 따라 조정
-okt = Okt()
-
-# ✅ 감정 분석기 로딩
+# Huggingface 감정분석 모델 로드
 @st.cache_resource
 def load_sentiment_model():
-    return pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment")
+    model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
+    return pipeline("sentiment-analysis", model=model_name)
 
 sentiment_model = load_sentiment_model()
 
-# ✅ 키워드 기반 감정 추가 분석용
+# 키워드 기반 감정 추가 분석용
 positive_keywords = ["좋", "재미있", "이해되", "유익", "도움", "흥미", "재밌"]
 negative_keywords = ["어렵", "지루", "이해못", "싫", "부족", "시간없", "혼란", "복잡", "별로", "재미없"]
 
-# ✅ 수업 목표
+# 수업 목표 리스트
 lesson_goals = [
     "자연 현상과 일상생활에 대한 흥미와 호기심을 바탕으로 문제를 인식하고 해결하는 태도 함양",
     "과학 탐구 방법을 이해하고 문제를 과학적으로 탐구하는 능력 기르기",
@@ -27,7 +24,7 @@ lesson_goals = [
     "과학과 기술 및 사회의 상호 관계를 이해하고 참여적 시민의식 기르기"
 ]
 
-# ✅ 수업 활동 사전
+# 수업 활동 사전
 lesson_methods = {
     "전반부": [
         ("흥미 유발 영상 시청", ["프로젝터", "영상 자료"]),
@@ -49,7 +46,7 @@ lesson_methods = {
     ]
 }
 
-# ✅ 수업안 생성 함수
+# 수업안 생성 함수
 def generate_lesson_plan(topic):
     goal = random.choice(lesson_goals)
     plan = {
@@ -67,19 +64,19 @@ def generate_lesson_plan(topic):
     plan["설명"] = explanation
     return plan
 
-# ✅ 피드백 분석 함수
+# 키워드 기반 피드백 감정 분석
 def analyze_feedback(feedback, activity_map):
-    tokens = okt.morphs(feedback, stem=True)
-    pos = [w for w in tokens if any(p in w for p in positive_keywords)]
-    neg = [w for w in tokens if any(n in w for n in negative_keywords)]
+    pos = [k for k in positive_keywords if k in feedback]
+    neg = [k for k in negative_keywords if k in feedback]
 
-    sentiment_label = "중립"
     if pos and not neg:
         sentiment_label = "긍정"
     elif neg and not pos:
         sentiment_label = "부정"
     elif pos and neg:
         sentiment_label = "혼합"
+    else:
+        sentiment_label = "중립"
 
     matched_phase = None
     for phase, activity in activity_map.items():
@@ -95,7 +92,7 @@ def analyze_feedback(feedback, activity_map):
         "단계": matched_phase or "(자동 인식 실패)"
     }
 
-# ✅ 웹앱 UI 시작
+# Streamlit UI 시작
 st.set_page_config(page_title="AI 수업 설계 및 피드백 분석기", layout="wide")
 st.title("📘 AI 수업 설계 및 감정 기반 개선 도우미")
 st.markdown("---")
@@ -111,8 +108,7 @@ if subject_input:
     for phase in ["전반부", "중반부", "후반부"]:
         act = plan[phase]["활동"]
         tools = ", ".join(plan[phase]["도구"])
-        st.markdown(f"- **{phase}**: {act}  
-  🧰 도구: {tools}")
+        st.markdown(f"- **{phase}**: {act}  \n  🧰 도구: {tools}")
 
     st.info(plan["설명"])
 
@@ -127,16 +123,19 @@ if subject_input:
             activity_map = {phase: plan[phase]["활동"] for phase in ["전반부", "중반부", "후반부"]}
             feedbacks = feedback_input.strip().split("\n")
             st.subheader("📊 피드백 분석 결과")
+
             for fb in feedbacks:
                 analysis = analyze_feedback(fb, activity_map)
-                ai_result = sentiment_model(fb)[0]  # AI 모델 결과
+                ai_result = sentiment_model(fb)[0]  # Huggingface 모델 결과
+
                 st.markdown(f"**📝 피드백:** {fb}")
-                st.markdown(f"- 감정 분류(키워드 기반): {analysis['감정']}  
-- 긍정어: {analysis['긍정어']} / 부정어: {analysis['부정어']}  
-- AI 감정 분석: {ai_result['label']} ({ai_result['score']:.2f})  
-- 매칭된 단계: {analysis['단계']}")
+                st.markdown(f"- 감정 분류(키워드 기반): {analysis['감정']}  \n"
+                            f"- 긍정어: {analysis['긍정어']} / 부정어: {analysis['부정어']}  \n"
+                            f"- AI 감정 분석: {ai_result['label']} ({ai_result['score']:.2f})  \n"
+                            f"- 매칭된 단계: {analysis['단계']}")
                 st.markdown("---")
 
             st.success("✅ 분석이 완료되었습니다. 수업안 개선에 참고하세요!")
+
 else:
     st.info("👈 왼쪽 입력창에 수업 주제를 먼저 입력해주세요.")
