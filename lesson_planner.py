@@ -1,21 +1,21 @@
-
 import streamlit as st
 import random
 from transformers import pipeline
 
-# Huggingface 감정분석 모델 로드
-@st.cache_resource
+# ✅ 감정 분석 모델 로딩 (가벼운 모델로 변경 + 캐시 안정화)
+@st.cache(allow_output_mutation=True)
 def load_sentiment_model():
-    model_name = "nlptown/bert-base-multilingual-uncased-sentiment"
-    return pipeline("sentiment-analysis", model=model_name)
+    return pipeline("sentiment-analysis", 
+                    model="distilbert-base-multilingual-cased", 
+                    device=-1)  # CPU 명시
 
 sentiment_model = load_sentiment_model()
 
-# 키워드 기반 감정 추가 분석용
+# ✅ 긍정/부정 키워드 리스트
 positive_keywords = ["좋", "재미있", "이해되", "유익", "도움", "흥미", "재밌"]
 negative_keywords = ["어렵", "지루", "이해못", "싫", "부족", "시간없", "혼란", "복잡", "별로", "재미없"]
 
-# 수업 목표 리스트
+# ✅ 수업 목표
 lesson_goals = [
     "자연 현상과 일상생활에 대한 흥미와 호기심을 바탕으로 문제를 인식하고 해결하는 태도 함양",
     "과학 탐구 방법을 이해하고 문제를 과학적으로 탐구하는 능력 기르기",
@@ -23,7 +23,7 @@ lesson_goals = [
     "과학과 기술 및 사회의 상호 관계를 이해하고 참여적 시민의식 기르기"
 ]
 
-# 수업 활동 사전
+# ✅ 수업 활동 사전
 lesson_methods = {
     "전반부": [
         ("흥미 유발 영상 시청", ["프로젝터", "영상 자료"]),
@@ -45,7 +45,7 @@ lesson_methods = {
     ]
 }
 
-# 수업안 생성 함수
+# ✅ 수업안 생성 함수
 def generate_lesson_plan(topic):
     goal = random.choice(lesson_goals)
     plan = {
@@ -63,7 +63,7 @@ def generate_lesson_plan(topic):
     plan["설명"] = explanation
     return plan
 
-# 키워드 기반 피드백 감정 분석
+# ✅ 피드백 분석 함수
 def analyze_feedback(feedback, activity_map):
     pos = [k for k in positive_keywords if k in feedback]
     neg = [k for k in negative_keywords if k in feedback]
@@ -91,7 +91,7 @@ def analyze_feedback(feedback, activity_map):
         "단계": matched_phase or "(자동 인식 실패)"
     }
 
-# Streamlit UI 시작
+# ✅ Streamlit 웹 UI
 st.set_page_config(page_title="AI 수업 설계 및 피드백 분석기", layout="wide")
 st.title("📘 AI 수업 설계 및 감정 기반 개선 도우미")
 st.markdown("---")
@@ -113,7 +113,7 @@ if subject_input:
 
     st.markdown("---")
     st.header("2️⃣ 피드백 입력 및 분석")
-    feedback_input = st.text_area("학생 피드백을 입력하세요 (예: 너무 지루했어요, 자료가 어려웠어요 등)", height=200)
+    feedback_input = st.text_area("학생 피드백을 입력하세요 (여러 줄 가능)", height=200)
 
     if st.button("🧠 감정 분석 및 개선 제안"):
         if not feedback_input.strip():
@@ -125,7 +125,7 @@ if subject_input:
 
             for fb in feedbacks:
                 analysis = analyze_feedback(fb, activity_map)
-                ai_result = sentiment_model(fb)[0]  # Huggingface 모델 결과
+                ai_result = sentiment_model(fb)[0]  # 감정분석 모델 호출
 
                 st.markdown(f"**📝 피드백:** {fb}")
                 st.markdown(f"- 감정 분류(키워드 기반): {analysis['감정']}  \n"
