@@ -1,4 +1,4 @@
-import streamlit as st
+from transformers import pipeline
 
-st.title("Hello Streamlit!")
-st.write("이 화면이 나오면 기본 환경은 정상입니다.")
+model = pipeline("sentiment-analysis", model="finiteautomata/bertweet-base-sentiment-analysis")
+print(model("이거 너무 좋아요!"))
