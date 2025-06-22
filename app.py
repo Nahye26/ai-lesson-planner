@@ -36,6 +36,10 @@ default_time_distribution = {
     "후반부": 15
 }
 
+# 긍정/부정 키워드 (간단 감정분석용)
+positive_keywords = ["좋", "재미있", "이해되", "유익", "도움", "흥미", "재밌"]
+negative_keywords = ["어렵", "지루", "이해못", "싫", "부족", "시간없", "혼란", "복잡", "별로", "재미없"]
+
 # -------------------
 # 수업 계획 생성 함수
 def generate_lesson_plan(topic, approach, time_dist):
@@ -67,9 +71,47 @@ def generate_rationale(topic, goal, activities, time_dist):
     return rationale
 
 # -------------------
+# 간단 감정분석 (키워드 기반)
+def analyze_feedback(feedback_list):
+    results = []
+    for fb in feedback_list:
+        pos_count = sum(any(pk in word for pk in positive_keywords) for word in fb.split())
+        neg_count = sum(any(nk in word for nk in negative_keywords) for word in fb.split())
+        if pos_count > neg_count:
+            sentiment = "긍정"
+        elif neg_count > pos_count:
+            sentiment = "부정"
+        else:
+            sentiment = "중립"
+        results.append((fb, sentiment))
+    return results
+
+# -------------------
+# 피드백 기반 수업 개선 제안 (단순 예시)
+def improve_plan(plan, feedback_analysis):
+    # 부정 피드백이 많은 단계가 있으면 해당 단계 활동 교체
+    phases = ["전반부", "중반부", "후반부"]
+    modified = False
+    for phase in phases:
+        neg_feedbacks = [fb for fb, sent in feedback_analysis if (phase in fb and sent == "부정")]
+        if len(neg_feedbacks) > 0:
+            current_activity = plan[phase]["활동"]
+            candidates = [m for m, _ in lesson_activities[next(iter(lesson_activities))][phase] if m != current_activity]
+            if candidates:
+                new_activity = random.choice(candidates)
+                # 도구 찾기
+                for mode in lesson_activities:
+                    for m, tools in lesson_activities[mode][phase]:
+                        if m == new_activity:
+                            plan[phase] = {"활동": m, "도구": tools}
+                            modified = True
+                            break
+    return modified, plan
+
+# -------------------
 # Streamlit UI 시작
-st.set_page_config(page_title="AI 수업 설계기 - 탐구/활동/개념 선택 및 시간배분", layout="wide")
-st.title("📘 AI 수업 설계기")
+st.set_page_config(page_title="AI 수업 설계기 - 완성판", layout="wide")
+st.title("📘 AI 수업 설계기 - 탐구/활동/개념 선택, 시간 배분, 피드백 반영")
 
 st.header("1️⃣ 수업 주제 입력")
 topic = st.text_input("수업 주제를 입력하세요 (예: 생물과 환경)")
@@ -83,13 +125,13 @@ time_option = st.radio("시간 배분을 선택하세요", options=["추천 시�
 if time_option == "추천 시간 배분 사용":
     time_dist = default_time_distribution
 else:
-    st.write("단위: 분")
+    st.write("단위: 분 (총합 40분 이내)")
     t1 = st.number_input("전반부 시간", min_value=1, max_value=40, value=10)
     t2 = st.number_input("중반부 시간", min_value=1, max_value=40, value=15)
     t3 = st.number_input("후반부 시간", min_value=1, max_value=40, value=15)
     total = t1 + t2 + t3
     if total > 40:
-        st.error("총 시간은 40분을 넘을 수 없습니다!")
+        st.error("총 수업 시간은 40분을 넘을 수 없습니다!")
         st.stop()
     time_dist = {"전반부": t1, "중반부": t2, "후반부": t3}
 
@@ -105,5 +147,33 @@ if topic:
         st.markdown(f"- **{phase}** ({time_dist[phase]}분): {plan[phase]['활동']}  🧰 도구: {tools_str}")
 
     st.info(rationale)
+
+    st.header("4️⃣ 수업 피드백 입력")
+    st.markdown("수업 후 학생, 교사 피드백을 입력하세요. (빈 줄 입력 시 종료)")
+
+    feedbacks = []
+    feedback_text = st.text_area("피드백을 입력하세요 (각 피드백을 줄바꿈으로 구분)", height=150)
+    if feedback_text:
+        feedbacks = [f.strip() for f in feedback_text.split("\n") if f.strip()]
+
+    if feedbacks:
+        feedback_analysis = analyze_feedback(feedbacks)
+        st.subheader("🔍 피드백 감정 분석 결과")
+        for fb, sent in feedback_analysis:
+            st.write(f"• \"{fb}\" — [{sent}]")
+
+        # 수업 개선 제안
+        modified, new_plan = improve_plan(plan.copy(), feedback_analysis)
+        if modified:
+            st.success("🔧 부정적 피드백에 따라 일부 활동을 변경했습니다.")
+            st.subheader("📝 수정된 수업안")
+            for phase in ["전반부", "중반부", "후반부"]:
+                tools_str = ", ".join(new_plan[phase]["도구"])
+                st.markdown(f"- **{phase}** ({time_dist[phase]}분): {new_plan[phase]['활동']}  🧰 도구: {tools_str}")
+            new_rationale = generate_rationale(topic, new_plan["목표"], new_plan, time_dist)
+            st.info(new_rationale)
+        else:
+            st.info("✅ 피드백에 따른 수업 개선이 필요하지 않습니다.")
+
 else:
     st.info("👈 위 입력란에 수업 주제를 입력해주세요.")
