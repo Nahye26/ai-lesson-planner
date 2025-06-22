@@ -1,15 +1,22 @@
 import streamlit as st
 import random
-from transformers import pipeline
+import requests
 
-# 1) 감정 분석 모델 캐싱해서 로드
-@st.cache_resource(show_spinner=True)
-def load_sentiment_model():
-    return pipeline("sentiment-analysis", model="finiteautomata/bertweet-base-sentiment-analysis")
+# ====== Huggingface API 정보 =======
+API_URL = "https://api-inference.huggingface.co/models/finiteautomata/bertweet-base-sentiment-analysis"
+API_TOKEN = ""  # 꼭 본인 토큰으로 변경하세요!
 
-sentiment_model = load_sentiment_model()
+headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# 2) 수업 목표 리스트
+def query(payload):
+    response = requests.post(API_URL, headers=headers, json=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error(f"API 호출 실패: {response.status_code}")
+        return None
+
+# ====== 수업 목표 및 활동 =======
 lesson_goals = [
     "자연 현상과 일상생활에 대한 흥미와 호기심을 바탕으로 문제를 인식하고 해결하는 태도 함양",
     "과학 탐구 방법을 이해하고 문제를 과학적으로 탐구하는 능력 기르기",
@@ -17,7 +24,6 @@ lesson_goals = [
     "과학과 기술 및 사회의 상호 관계를 이해하고 참여적 시민의식 기르기"
 ]
 
-# 3) 수업 활동 사전 (간단화)
 lesson_methods = {
     "전반부": [
         ("흥미 유발 영상 시청", "영상 자료와 프로젝터를 활용하여 학생들의 흥미를 끌어냅니다."),
@@ -39,7 +45,6 @@ lesson_methods = {
     ]
 }
 
-# 4) 수업 설계 생성 함수
 def generate_lesson_plan(topic):
     goal = random.choice(lesson_goals)
     plan = {
@@ -54,21 +59,19 @@ def generate_lesson_plan(topic):
     plan["활동"] = activities
     return plan
 
-# 5) 웹 UI
-st.set_page_config(page_title="AI 수업 설계 및 감정 분석", layout="wide")
+# ====== Streamlit 앱 UI =======
+st.set_page_config(page_title="AI 수업 설계 및 감정 분석 (Huggingface API)", layout="wide")
 st.title("📚 AI 기반 수업 설계 및 감정 분석 도우미")
 
-# 입력: 수업 주제
 topic = st.text_input("1️⃣ 수업 주제를 입력하세요 (예: 생물과 환경)")
 
 if topic:
-    # 수업 설계 생성
     plan = generate_lesson_plan(topic)
 
     st.markdown("### ▶️ 생성된 수업 설계")
     st.markdown(f"- **주제:** {plan['주제']}")
     st.markdown(f"- **수업 목표:** {plan['목표']}")
-    st.markdown(f"- **수업 설계 근거:** {plan['설명']}")
+    st.markdown(f"- **설명:** {plan['설명']}")
     
     for phase in ["전반부", "중반부", "후반부"]:
         act = plan["활동"][phase]["활동"]
@@ -78,6 +81,7 @@ if topic:
 
     st.markdown("---")
     st.markdown("### 2️⃣ 학생 피드백 감정 분석")
+
     feedback_input = st.text_area("학생 피드백을 여러 줄로 입력하세요 (예: '자료가 너무 어려웠어요', '활동이 재미있었어요')", height=150)
 
     if st.button("감정 분석 시작"):
@@ -88,14 +92,16 @@ if topic:
             st.markdown(f"총 {len(feedback_list)}개의 피드백 분석 결과:")
 
             for fb in feedback_list:
-                result = sentiment_model(fb)[0]
-                label = result['label']
-                score = result['score']
-                st.markdown(f"- **피드백:** {fb}")
-                st.markdown(f"  - 감정 분석 결과: {label} (신뢰도: {score:.2f})")
-                st.markdown("---")
+                with st.spinner(f"'{fb}' 분석 중..."):
+                    result = query({"inputs": fb})
+                    if result:
+                        label = result[0]['label']
+                        score = result[0]['score']
+                        st.markdown(f"- **피드백:** {fb}")
+                        st.markdown(f"  - 감정 분석 결과: **{label}** (신뢰도: {score:.2f})")
+                        st.markdown("---")
 
-# 6) 추가 아이디어
+# 사이드바 아이디어 제안
 st.sidebar.title("💡 추가 기능 제안")
 st.sidebar.markdown("""
 - 수업 활동별 피드백 분류 및 개선 제안  
