@@ -2,16 +2,25 @@ import streamlit as st
 import random
 from transformers import pipeline
 
-# ✅ 감정 분석 모델 로딩 (가벼운 모델로 변경 + 캐시 안정화)
+# ✅ 감정 분석 모델 로딩 (Streamlit Cloud 대응용, try-except 포함)
 @st.cache(allow_output_mutation=True)
 def load_sentiment_model():
-    return pipeline("sentiment-analysis", 
-                    model="distilbert-base-multilingual-cased", 
-                    device=-1)  # CPU 명시
+    try:
+        st.info("🔄 감정 분석 모델 로딩 중입니다. (최초 실행 시 30초~1분)")
+        model = pipeline("sentiment-analysis", 
+                         model="distilbert-base-multilingual-cased", 
+                         device=-1)  # CPU 명시
+        return model
+    except Exception as e:
+        st.error(f"❌ 감정 분석 모델 로딩 실패: {str(e)}")
+        return None
 
+# ✅ 모델 로딩 시도
 sentiment_model = load_sentiment_model()
+if sentiment_model is None:
+    st.stop()
 
-# ✅ 긍정/부정 키워드 리스트
+# ✅ 감정 키워드
 positive_keywords = ["좋", "재미있", "이해되", "유익", "도움", "흥미", "재밌"]
 negative_keywords = ["어렵", "지루", "이해못", "싫", "부족", "시간없", "혼란", "복잡", "별로", "재미없"]
 
@@ -23,7 +32,7 @@ lesson_goals = [
     "과학과 기술 및 사회의 상호 관계를 이해하고 참여적 시민의식 기르기"
 ]
 
-# ✅ 수업 활동 사전
+# ✅ 수업 활동 목록
 lesson_methods = {
     "전반부": [
         ("흥미 유발 영상 시청", ["프로젝터", "영상 자료"]),
@@ -91,7 +100,7 @@ def analyze_feedback(feedback, activity_map):
         "단계": matched_phase or "(자동 인식 실패)"
     }
 
-# ✅ Streamlit 웹 UI
+# ✅ Streamlit 앱 구성
 st.set_page_config(page_title="AI 수업 설계 및 피드백 분석기", layout="wide")
 st.title("📘 AI 수업 설계 및 감정 기반 개선 도우미")
 st.markdown("---")
@@ -113,7 +122,7 @@ if subject_input:
 
     st.markdown("---")
     st.header("2️⃣ 피드백 입력 및 분석")
-    feedback_input = st.text_area("학생 피드백을 입력하세요 (여러 줄 가능)", height=200)
+    feedback_input = st.text_area("학생 피드백을 입력하세요 (예: 활동이 어려웠어요)", height=200)
 
     if st.button("🧠 감정 분석 및 개선 제안"):
         if not feedback_input.strip():
@@ -125,7 +134,7 @@ if subject_input:
 
             for fb in feedbacks:
                 analysis = analyze_feedback(fb, activity_map)
-                ai_result = sentiment_model(fb)[0]  # 감정분석 모델 호출
+                ai_result = sentiment_model(fb)[0]  # AI 모델로 감정 분석
 
                 st.markdown(f"**📝 피드백:** {fb}")
                 st.markdown(f"- 감정 분류(키워드 기반): {analysis['감정']}  \n"
@@ -135,6 +144,5 @@ if subject_input:
                 st.markdown("---")
 
             st.success("✅ 분석이 완료되었습니다. 수업안 개선에 참고하세요!")
-
 else:
     st.info("👈 왼쪽 입력창에 수업 주제를 먼저 입력해주세요.")
