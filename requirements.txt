@@ -1,4 +1,2 @@
-streamlit
-transformers
-torch
-konlpy
+pip install streamlit transformers sentencepiece
+
