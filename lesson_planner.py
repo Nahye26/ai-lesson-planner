@@ -19,11 +19,14 @@ with st.expander("❓ 사용법 안내 보기"):
 # 감정 분석 파이프라인 캐시로 로드
 @st.cache_resource
 def load_sentiment_pipeline():
-    return pipeline("sentiment-analysis")
+    return pipeline(
+        "sentiment-analysis",
+        model="distilbert-base-uncased-finetuned-sst-2-english"
+    )
 
 classifier = load_sentiment_pipeline()
 
-# 내장된 학습 목표 데이터 (과목 → 주제 → 학년 → 목표 리스트)
+# 내장된 학습 목표 데이터
 goal_bank = {
     "과학": {
         "생물과 환경": {
@@ -60,7 +63,7 @@ goal_bank = {
     }
 }
 
-# 내장된 수업 자료 추천 데이터 (주제 → 자료 리스트)
+# 수업 자료 추천 데이터
 materials = {
     "생물과 환경": ["생태계 시뮬레이션 활동지", "먹이사슬 보드게임", "생물 관찰 영상"],
     "물질의 성질": ["상태 변화 관찰 실험 도구", "혼합물 실험 키트", "화학 반응 시뮬레이터"],
@@ -69,15 +72,12 @@ materials = {
     "자기소개": ["영어 자기소개 템플릿", "스피킹 연습 카드", "발표 영상 예시"]
 }
 
-# 학습 목표 반환 함수
 def get_goals_ai(subject, topic, grade):
     return goal_bank.get(subject, {}).get(topic, {}).get(grade, ["(선택한 항목에 대한 성취기준 정보 없음)"])
 
-# 수업 자료 반환 함수
 def recommend_materials(topic):
     return materials.get(topic, ["추천 자료 없음"])
 
-# 교사용 설득 설명문 생성
 def generate_teacher_note(subject, topic, grade, goals, materials):
     goal_text = ", ".join(goals)
     materials_text = ", ".join(materials)
@@ -90,7 +90,6 @@ def generate_teacher_note(subject, topic, grade, goals, materials):
     )
     return note
 
-# 수업 유형 설명
 type_explain = {
     "탐구 중심": "스스로 탐구하며 개념을 발견하도록 구성합니다.",
     "토의 중심": "주제에 대한 협력적 토의를 중심으로 전개합니다.",
@@ -98,7 +97,6 @@ type_explain = {
     "프로젝트형": "문제 해결 프로젝트를 통해 협력을 강화합니다."
 }
 
-# 수업 설계 템플릿 생성
 def generate_template(topic, lesson_type, goals, intro_time, main_time, outro_time, custom_activity):
     goal_text = "- " + "\n- ".join(goals)
     materials_list = recommend_materials(topic)
@@ -127,9 +125,8 @@ def generate_template(topic, lesson_type, goals, intro_time, main_time, outro_ti
 {teacher_note}
 """
 
-# --- UI 시작 ---
+# UI 시작
 st.subheader("1️⃣ 수업 기본 정보 입력")
-
 subject = st.selectbox("과목 선택", list(goal_bank.keys()))
 topic_list = list(goal_bank.get(subject, {}).keys())
 topic = st.selectbox("단원명 선택", topic_list) if topic_list else st.text_input("단원명 입력")
@@ -180,7 +177,6 @@ if st.button("🧠 피드백 분석 및 수업 개선 제안"):
         st.markdown("### 🔧 개선된 수업안")
         st.markdown(modified_plan)
 
-        # 로그 저장 (lesson_history.json에 한 줄씩 JSON 저장)
         log = {
             "date": str(datetime.now()),
             "subject": subject,
@@ -194,3 +190,4 @@ if st.button("🧠 피드백 분석 및 수업 개선 제안"):
             f.write(json.dumps(log, ensure_ascii=False) + "\n")
 
         st.success("💾 개선된 수업안이 저장되었습니다.")
+
