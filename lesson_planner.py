@@ -2,20 +2,18 @@ import streamlit as st
 import random
 from transformers import pipeline
 
-# ✅ 감정 분석 모델 로딩 (Streamlit Cloud 대응용, try-except 포함)
+# ✅ 더 가벼운 감정 분석 모델 로딩
 @st.cache(allow_output_mutation=True)
 def load_sentiment_model():
     try:
         st.info("🔄 감정 분석 모델 로딩 중입니다. (최초 실행 시 30초~1분)")
-        model = pipeline("sentiment-analysis", 
-                         model="distilbert-base-multilingual-cased", 
-                         device=-1)  # CPU 명시
-        return model
+        return pipeline("sentiment-analysis", 
+                        model="finiteautomata/bertweet-base-sentiment-analysis", 
+                        device=-1)
     except Exception as e:
-        st.error(f"❌ 감정 분석 모델 로딩 실패: {str(e)}")
+        st.error(f"❌ 모델 로딩 실패: {str(e)}")
         return None
 
-# ✅ 모델 로딩 시도
 sentiment_model = load_sentiment_model()
 if sentiment_model is None:
     st.stop()
@@ -134,7 +132,7 @@ if subject_input:
 
             for fb in feedbacks:
                 analysis = analyze_feedback(fb, activity_map)
-                ai_result = sentiment_model(fb)[0]  # AI 모델로 감정 분석
+                ai_result = sentiment_model(fb)[0]  # AI 감정 분석
 
                 st.markdown(f"**📝 피드백:** {fb}")
                 st.markdown(f"- 감정 분류(키워드 기반): {analysis['감정']}  \n"
