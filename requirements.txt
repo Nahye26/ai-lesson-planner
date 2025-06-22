@@ -1,4 +1,5 @@
+
 streamlit
 konlpy
-transformers
-torch
+matplotlib
+JPype1
