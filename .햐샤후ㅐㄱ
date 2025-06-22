@@ -1,0 +1,9 @@
+# __pycache__ 같은 자동 생성 폴더
+__pycache__/
+*.pyc
+
+# 환경변수 파일은 꼭 숨기기!
+.env
+
+# Streamlit 임시 파일
+.streamlit/
